@@ -50,7 +50,7 @@ func main() {
 
 	rs = db.Hmget("myhmset", []string{"k1", "k2", "k3", "k8"})
 	if rs.State == "ok" {
-		for _, v := range rs.Hash() {
+		for _, v := range rs.Data {
 			fmt.Println(v.Key, v.ValStr())
 		}
 	}
@@ -61,9 +61,9 @@ func main() {
 
 	db.Zset("mytest", "key1", 100)
 
-	rs = db.Zget("mytest", "key1")
-	if rs.State == "ok" {
-		fmt.Println(rs.Int64())
+	rs2 := db.Zget("mytest", "key1")
+	if rs2.State == "ok" {
+		fmt.Println(rs2.Int64())
 	}
 
 	fmt.Println(db.Zincr("num", "k1", 2))

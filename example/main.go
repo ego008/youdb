@@ -36,8 +36,8 @@ func main() {
 
 	fmt.Println("----Hmget")
 	rs = db.Hmget("myhmset", []string{"k1", "k2", "k3", "k4", "k8"})
-	for _, v := range rs.Hash() {
-		fmt.Println(string(v.KeyStr()), v.ValStr(), v.ValInt64())
+	for _, v := range rs.Data {
+		fmt.Println(v.Key, v.ValStr(), v.ValInt64())
 	}
 
 	hargs := []string{"", "k2", "k3", "k4", "k6"}
@@ -46,8 +46,8 @@ func main() {
 	for _, v := range hargs {
 		fmt.Println("keyStart:", v)
 		rs = db.Hscan("myhmset", v, 4)
-		for _, v := range rs.Hash() {
-			fmt.Println(string(v.KeyStr()), v.ValStr(), v.ValInt64(), v.Value)
+		for _, v := range rs.Data {
+			fmt.Println(v.Key, v.ValStr(), v.ValInt64(), v.Value)
 		}
 		fmt.Println()
 	}
@@ -56,8 +56,8 @@ func main() {
 	for _, v := range hargs {
 		fmt.Println("keyStart:", v)
 		rs = db.Hrscan("myhmset", v, 4)
-		for _, v := range rs.Hash() {
-			fmt.Println(string(v.KeyStr()), v.ValStr(), v.ValInt64(), v.Value)
+		for _, v := range rs.Data {
+			fmt.Println(v.Key, v.ValStr(), v.ValInt64(), v.Value)
 		}
 		fmt.Println()
 	}
@@ -72,10 +72,11 @@ func main() {
 	fmt.Println("----------------zet")
 	fmt.Println(db.Zset("mytest", "key1", 100))
 	fmt.Println(db.Zget("mytest", "key1"))
-	fmt.Println(db.Zget("mytest22", "key1")) // not exist
+	fmt.Println(db.Zget("mytest22", "key1")) // bucket not exist
+	fmt.Println(db.Zget("mytest", "key1xxx")) // key not exist
 	fmt.Println(db.Zset("mytest", "key2", 123000099876521398))
-	rs = db.Zget("mytest", "key2")
-	fmt.Println(rs.String(), rs.Int64(), rs.Int(), rs.Uint(), rs.Uint64())
+	rs2 := db.Zget("mytest", "key2")
+	fmt.Println(rs2.String(), rs2.Int64(), rs2.Int(), rs2.Uint(), rs2.Uint64())
 
 	dataMap2 := map[string]int64{}
 	dataMap2["k1"] = 1
@@ -94,9 +95,9 @@ func main() {
 	fmt.Println(db.Zmget("myhmset", []string{"k1", "k2", "k3"}))
 
 	fmt.Println("----Zmget")
-	rs = db.Zmget("myhmset", []string{"k1", "k2", "k3", "k4"})
-	for _, v := range rs.Hash() {
-		fmt.Println(string(v.KeyStr()), v.ValInt64())
+	rs2 = db.Zmget("myhmset", []string{"k1", "k2", "k3", "k4"})
+	for _, v := range rs2.Data {
+		fmt.Println(v.Key, v.Value)
 	}
 
 	zargs := [][]string{
@@ -110,9 +111,9 @@ func main() {
 	fmt.Println("----Zscan----")
 	for _, v := range zargs {
 		fmt.Println("keystart:", v[0], "scoreStart:", v[1])
-		rs = db.Zscan("myhmset", v[0], v[1], 4)
-		for _, v := range rs.Hash() {
-			fmt.Println(string(v.KeyStr()), v.ValInt64(), v.Value)
+		rs2 = db.Zscan("myhmset", v[0], v[1], 4)
+		for _, v := range rs2.Data {
+			fmt.Println(v.Key, v.Value)
 		}
 		fmt.Println()
 	}
@@ -120,9 +121,9 @@ func main() {
 	fmt.Println("----Zrscan----")
 	for _, v := range zargs {
 		fmt.Println("keystart:", v[0], "scoreStart:", v[1])
-		rs = db.Zrscan("myhmset", v[0], v[1], 4)
-		for _, v := range rs.Hash() {
-			fmt.Println(string(v.KeyStr()), v.ValInt64(), v.Value)
+		rs2 = db.Zrscan("myhmset", v[0], v[1], 4)
+		for _, v := range rs2.Data {
+			fmt.Println(v.Key, v.Value)
 		}
 		fmt.Println()
 	}
@@ -134,7 +135,7 @@ func main() {
 	fmt.Println(db.Zdel("notexist", "test"))
 
 	fmt.Println("-----Zdel")
-	fmt.Println(db.Zset("mytest2", "key1", 100))
+	fmt.Println(db.Zset("mytest2", "key1", 101))
 	fmt.Println(db.Zget("mytest2", "key1").Uint64())
 	fmt.Println(db.Zdel("mytest2", "key1"))
 	fmt.Println("get again", db.Zget("mytest2", "key1"))

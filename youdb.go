@@ -31,19 +31,24 @@ type (
 		*bolt.DB
 	}
 
-	Reply struct {
-		State string
-		Data  [][]byte
-	}
-
 	Entry struct {
 		Key string
 		Value []byte
 	}
 
+	Reply struct {
+		State string
+		Data  []*Entry
+	}
+
 	ZetEntry struct {
 		Key   string
 		Value int64
+	}
+
+	ZetReply struct {
+		State string
+		Data  []*ZetEntry
 	}
 )
 
@@ -147,7 +152,7 @@ func (db *DB) HdelBucket(name string) error {
 func (db *DB) Hget(name, key string) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  make([][]byte, 1),
+		Data:  []*Entry{},
 	}
 	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -158,7 +163,7 @@ func (db *DB) Hget(name, key string) *Reply {
 		v := b.Get([]byte(key))
 		if v != nil {
 			r.State = replyOK
-			r.Data[0] = v
+			r.Data = append(r.Data, &Entry{key, v})
 		} else {
 			r.State = replyNotFound
 		}
@@ -173,7 +178,7 @@ func (db *DB) Hget(name, key string) *Reply {
 func (db *DB) Hmget(name string, keys []string) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  [][]byte{},
+		Data:  []*Entry{},
 	}
 	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -185,7 +190,7 @@ func (db *DB) Hmget(name string, keys []string) *Reply {
 			k := []byte(key)
 			v := b.Get(k)
 			if v != nil {
-				r.Data = append(r.Data, k, v)
+				r.Data = append(r.Data, &Entry{key, v})
 			}
 		}
 		return nil
@@ -199,7 +204,7 @@ func (db *DB) Hmget(name string, keys []string) *Reply {
 func (db *DB) Hscan(name, keyStart string, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  [][]byte{},
+		Data:  []*Entry{},
 	}
 	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -216,7 +221,7 @@ func (db *DB) Hscan(name, keyStart string, limit int) *Reply {
 		for k, v := c.Seek(startKey); k != nil; k, v = c.Next() {
 			if bytes.Compare(k, startKey) == 1 {
 				n++
-				r.Data = append(r.Data, k, v)
+				r.Data = append(r.Data, &Entry{string(k), v})
 				if n == limit {
 					break
 				}
@@ -233,7 +238,7 @@ func (db *DB) Hscan(name, keyStart string, limit int) *Reply {
 func (db *DB) Hrscan(name, keyStart string, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  [][]byte{},
+		Data:  []*Entry{},
 	}
 	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -253,7 +258,7 @@ func (db *DB) Hrscan(name, keyStart string, limit int) *Reply {
 		for k, v := k0, v0; k != nil; k, v = c.Prev() {
 			if bytes.Compare(k, startKey) == -1 {
 				n++
-				r.Data = append(r.Data, k, v)
+				r.Data = append(r.Data, &Entry{string(k), v})
 				if n >= limit {
 					break
 				}
@@ -453,10 +458,10 @@ func (db *DB) ZdelBucket(name string) error {
 	})
 }
 
-func (db *DB) Zget(name, key string) *Reply {
-	r := &Reply{
+func (db *DB) Zget(name, key string) *ZetReply {
+	r := &ZetReply{
 		State: replyError,
-		Data:  make([][]byte, 1),
+		Data:  []*ZetEntry{},
 	}
 	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -467,7 +472,7 @@ func (db *DB) Zget(name, key string) *Reply {
 		v := b.Get([]byte(key))
 		if v != nil {
 			r.State = replyOK
-			r.Data[0] = v
+			r.Data = append(r.Data, &ZetEntry{key, int64(binary.BigEndian.Uint64(v))})
 		} else {
 			r.State = replyNotFound
 		}
@@ -479,10 +484,10 @@ func (db *DB) Zget(name, key string) *Reply {
 	return r
 }
 
-func (db *DB) Zmget(name string, keys []string) *Reply {
-	r := &Reply{
+func (db *DB) Zmget(name string, keys []string) *ZetReply {
+	r := &ZetReply{
 		State: replyError,
-		Data:  [][]byte{},
+		Data:  []*ZetEntry{},
 	}
 	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
 
@@ -495,7 +500,7 @@ func (db *DB) Zmget(name string, keys []string) *Reply {
 			k := []byte(key)
 			v := b.Get(k)
 			if v != nil {
-				r.Data = append(r.Data, k, v)
+				r.Data = append(r.Data, &ZetEntry{key, int64(binary.BigEndian.Uint64(v))})
 			}
 		}
 
@@ -507,10 +512,10 @@ func (db *DB) Zmget(name string, keys []string) *Reply {
 	return r
 }
 
-func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *Reply {
-	r := &Reply{
+func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *ZetReply {
+	r := &ZetReply{
 		State: replyError,
-		Data:  [][]byte{},
+		Data:  []*ZetEntry{},
 	}
 	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
 
@@ -537,7 +542,7 @@ func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *Reply {
 		for k, _ := c.Seek(scoreStartB); k != nil; k, _ = c.Next() {
 			if bytes.Compare(k, startScoreKeyB) == 1 {
 				n++
-				r.Data = append(r.Data, k[8:], k[0:8])
+				r.Data = append(r.Data, &ZetEntry{string(k[8:]), int64(binary.BigEndian.Uint64(k[0:8]))})
 				if n == limit {
 					break
 				}
@@ -551,10 +556,10 @@ func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *Reply {
 	return r
 }
 
-func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *Reply {
-	r := &Reply{
+func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *ZetReply {
+	r := &ZetReply{
 		State: replyError,
-		Data:  [][]byte{},
+		Data:  []*ZetEntry{},
 	}
 	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
 
@@ -593,7 +598,7 @@ func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *Reply {
 		for k, _ := k0, v0; k != nil; k, _ = c.Prev() {
 			if bytes.Compare(k, startScoreKeyB) == -1 {
 				n++
-				r.Data = append(r.Data, k[8:], k[0:8])
+				r.Data = append(r.Data, &ZetEntry{string(k[8:]), int64(binary.BigEndian.Uint64(k[0:8]))})
 				if n == limit {
 					break
 				}
@@ -611,7 +616,7 @@ func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *Reply {
 
 func (r *Reply) String() string {
 	if len(r.Data) > 0 {
-		return string(r.Data[0])
+		return string(r.Data[0].Value)
 	}
 	return ""
 }
@@ -635,67 +640,68 @@ func (r *Reply) Uint64() uint64 {
 	if len(r.Data) < 1 {
 		return 0
 	}
-	if len(r.Data[0]) < 8 {
+	if len(r.Data[0].Value) < 8 {
 		return 0
 	}
-	return binary.BigEndian.Uint64(r.Data[0])
+	return binary.BigEndian.Uint64(r.Data[0].Value)
 }
-
-func (r *Reply) Hash() []Entry {
-	hs := []Entry{}
-	if len(r.Data) < 2 {
-		return hs
-	}
-	for i := 0; i < (len(r.Data) - 1); i += 2 {
-		hs = append(hs, Entry{string(r.Data[i]), r.Data[i+1]})
-	}
-	return hs
-}
-
-func (r *Reply) ZetHash() []ZetEntry {
-	hs := []ZetEntry{}
-	if len(r.Data) < 2 {
-		return hs
-	}
-	for i := 0; i < (len(r.Data) - 1); i += 2 {
-		hs = append(hs, ZetEntry{string(r.Data[i]), int64(binary.BigEndian.Uint64(r.Data[i+1]))})
-	}
-	return hs
-}
-
-
 
 func (r *Reply) Dict() map[string][]byte {
 	dict := make(map[string][]byte)
 	if len(r.Data) < 2 {
 		return dict
 	}
-	for i := 0; i < (len(r.Data) - 1); i += 2 {
-		dict[string(r.Data[i])] = r.Data[i+1]
-	}
-	return dict
-}
-
-func (r *Reply) ZetDict() map[string]int64 {
-	dict := make(map[string]int64)
-	if len(r.Data) < 2 {
-		return dict
-	}
-	for i := 0; i < (len(r.Data) - 1); i += 2 {
-		dict[string(r.Data[i])] = int64(binary.BigEndian.Uint64(r.Data[i+1]))
+	for _, i := range r.Data {
+		dict[i.Key] = i.Value
 	}
 	return dict
 }
 
 func (r *Reply) Json(v interface{}) error {
-	return json.Unmarshal(r.Data[0], &v)
+	return json.Unmarshal(r.Data[0].Value, &v)
+}
+
+func (r *ZetReply) String() string {
+	if len(r.Data) > 0 {
+		return strconv.FormatInt(r.Data[0].Value,10)
+	}
+	return ""
+}
+
+func (r *ZetReply) Int() int {
+	return int(r.Int64())
+}
+
+func (r *ZetReply) Int64() int64 {
+	if len(r.Data) < 1 {
+		return 0
+	}
+	return int64(r.Uint64())
+}
+
+func (r *ZetReply) Uint() uint {
+	return uint(r.Uint64())
+}
+
+func (r *ZetReply) Uint64() uint64 {
+	if len(r.Data) < 1 {
+		return 0
+	}
+	return uint64(r.Data[0].Value)
+}
+
+func (r *ZetReply) Dict() map[string]int64 {
+	dict := make(map[string]int64)
+	if len(r.Data) < 2 {
+		return dict
+	}
+	for _, i := range r.Data {
+		dict[i.Key] = i.Value
+	}
+	return dict
 }
 
 // Entry method
-
-func (r *Entry) KeyStr() string {
-	return string(r.Key)
-}
 
 func (r *Entry) ValStr() string {
 	return string(r.Value)
@@ -710,6 +716,14 @@ func (r *Entry) ValInt64() int64 {
 
 func (r *Entry) Json(v interface{}) error {
 	return json.Unmarshal(r.Value, v)
+}
+
+func (r *ZetEntry) ValStr() string {
+	return strconv.FormatInt(r.Value,10)
+}
+
+func (r *ZetEntry) ValInt() int {
+	return int(r.Value)
 }
 
 // ----- util func ----
