@@ -648,7 +648,7 @@ func (r *Reply) Uint64() uint64 {
 
 func (r *Reply) Dict() map[string][]byte {
 	dict := make(map[string][]byte)
-	if len(r.Data) < 2 {
+	if len(r.Data) < 1 {
 		return dict
 	}
 	for _, i := range r.Data {
@@ -692,7 +692,7 @@ func (r *ZetReply) Uint64() uint64 {
 
 func (r *ZetReply) Dict() map[string]int64 {
 	dict := make(map[string]int64)
-	if len(r.Data) < 2 {
+	if len(r.Data) < 1 {
 		return dict
 	}
 	for _, i := range r.Data {
