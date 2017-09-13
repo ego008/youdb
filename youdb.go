@@ -1,3 +1,6 @@
+/*
+Package youdb is a Bolt wrapper that allows easy store hash, zset data.
+*/
 package youdb
 
 import (
