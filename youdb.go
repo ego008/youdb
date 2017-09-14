@@ -111,7 +111,7 @@ func (db *DB) Hincr(name, key string, step int64) (int64, error) {
 		var oldNum int64
 		v := b.Get([]byte(key))
 		if len(v) > 0 {
-			oldNum = btoi(v)
+			oldNum = Btoi(v)
 		}
 		if step > 0 {
 			if (scoreMax - step) < oldNum {
@@ -124,7 +124,7 @@ func (db *DB) Hincr(name, key string, step int64) (int64, error) {
 		}
 
 		oldNum += step
-		err = b.Put([]byte(key), itob(oldNum))
+		err = b.Put([]byte(key), Itob(oldNum))
 		if err != nil {
 			return err
 		}
@@ -278,7 +278,7 @@ func (db *DB) Hrscan(name, keyStart string, limit int) *Reply {
 // ---- zet ----
 
 func (db *DB) Zset(name, key string, val int64) error {
-	score := itob(val)
+	score := Itob(val)
 	keyB := []byte(key)
 	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
 	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
@@ -320,7 +320,7 @@ func (db *DB) Zset(name, key string, val int64) error {
 func (db *DB) Zmset(name string, kv map[string]int64) error {
 	newKv := map[string][]byte{}
 	for k, v := range kv {
-		newKv[k] = itob(v)
+		newKv[k] = Itob(v)
 	}
 
 	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
@@ -384,7 +384,7 @@ func (db *DB) Zincr(name, key string, step int64) (int64, error) {
 
 		vOld := b2.Get(keyB)
 		if vOld != nil {
-			score = btoi(vOld)
+			score = Btoi(vOld)
 		}
 		if step > 0 {
 			if (scoreMax - step) < score {
@@ -397,7 +397,7 @@ func (db *DB) Zincr(name, key string, step int64) (int64, error) {
 		}
 
 		score += step
-		newScoreB := itob(score)
+		newScoreB := Itob(score)
 		newKey := bconcat([][]byte{newScoreB, keyB})
 
 		err1 = b1.Put(newKey, []byte{})
@@ -531,7 +531,7 @@ func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 		startScore = i
 	}
 
-	scoreStartB := itob(startScore)
+	scoreStartB := Itob(startScore)
 	startScoreKeyB := bconcat([][]byte{scoreStartB, []byte(keyStart)})
 
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -580,7 +580,7 @@ func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 		startKey = []byte(keyStart)
 	}
 
-	scoreStartB := itob(startScore)
+	scoreStartB := Itob(startScore)
 	startScoreKeyB := bconcat([][]byte{scoreStartB, []byte(startKey)})
 
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -744,12 +744,12 @@ func bconcat(slices [][]byte) []byte {
 	return tmp
 }
 
-func itob(v int64) []byte {
+func Itob(v int64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, uint64(v))
 	return b
 }
 
-func btoi(v []byte) int64 {
+func Btoi(v []byte) int64 {
 	return int64(binary.BigEndian.Uint64(v))
 }
