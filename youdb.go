@@ -73,7 +73,7 @@ func (db *DB) Close() error {
 // --- hash ------
 
 func (db *DB) Hset(name, key string, val []byte) error {
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(bucketName)
 		if err != nil {
@@ -84,7 +84,7 @@ func (db *DB) Hset(name, key string, val []byte) error {
 }
 
 func (db *DB) Hmset(name string, kv map[string][]byte) error {
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(bucketName)
 		if err != nil {
@@ -102,7 +102,7 @@ func (db *DB) Hmset(name string, kv map[string][]byte) error {
 
 func (db *DB) Hincr(name, key string, step int64) (int64, error) {
 	var i int64
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(bucketName)
 		if err != nil {
@@ -135,7 +135,7 @@ func (db *DB) Hincr(name, key string, step int64) (int64, error) {
 }
 
 func (db *DB) Hdel(name, key string) error {
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b != nil {
@@ -146,7 +146,7 @@ func (db *DB) Hdel(name, key string) error {
 }
 
 func (db *DB) HdelBucket(name string) error {
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
 		return tx.DeleteBucket(bucketName)
 	})
@@ -157,7 +157,7 @@ func (db *DB) Hget(name, key string) *Reply {
 		State: replyError,
 		Data:  []*Entry{},
 	}
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
@@ -183,7 +183,7 @@ func (db *DB) Hmget(name string, keys []string) *Reply {
 		State: replyError,
 		Data:  []*Entry{},
 	}
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
@@ -209,7 +209,7 @@ func (db *DB) Hscan(name, keyStart string, limit int) *Reply {
 		State: replyError,
 		Data:  []*Entry{},
 	}
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
@@ -243,7 +243,7 @@ func (db *DB) Hrscan(name, keyStart string, limit int) *Reply {
 		State: replyError,
 		Data:  []*Entry{},
 	}
-	bucketName := bconcat([][]byte{hashPrefix, []byte(name)})
+	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketName)
 		if b == nil {
@@ -280,9 +280,9 @@ func (db *DB) Hrscan(name, keyStart string, limit int) *Reply {
 func (db *DB) Zset(name, key string, val int64) error {
 	score := Itob(val)
 	keyB := []byte(key)
-	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
-	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
-	newKey := bconcat([][]byte{score, keyB})
+	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, []byte(name)})
+	newKey := Bconcat([][]byte{score, keyB})
 	return db.DB.Update(func(tx *bolt.Tx) error {
 		b1, err1 := tx.CreateBucketIfNotExists(keyBucket)
 		if err1 != nil {
@@ -306,7 +306,7 @@ func (db *DB) Zset(name, key string, val int64) error {
 			}
 
 			if oldScore != nil {
-				oldKey := bconcat([][]byte{oldScore, keyB})
+				oldKey := Bconcat([][]byte{oldScore, keyB})
 				err1 = b1.Delete(oldKey)
 				if err1 != nil {
 					return err1
@@ -323,8 +323,8 @@ func (db *DB) Zmset(name string, kv map[string]int64) error {
 		newKv[k] = Itob(v)
 	}
 
-	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
-	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
+	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, []byte(name)})
 
 	return db.DB.Update(func(tx *bolt.Tx) error {
 		b1, err1 := tx.CreateBucketIfNotExists(keyBucket)
@@ -338,7 +338,7 @@ func (db *DB) Zmset(name string, kv map[string]int64) error {
 
 		for k, score := range newKv {
 			keyB := []byte(k)
-			newKey := bconcat([][]byte{score, keyB})
+			newKey := Bconcat([][]byte{score, keyB})
 
 			oldScore := b2.Get(keyB)
 			if !bytes.Equal(oldScore, score) {
@@ -353,7 +353,7 @@ func (db *DB) Zmset(name string, kv map[string]int64) error {
 				}
 
 				if oldScore != nil {
-					oldKey := bconcat([][]byte{oldScore, keyB})
+					oldKey := Bconcat([][]byte{oldScore, keyB})
 					err1 = b1.Delete(oldKey)
 					if err1 != nil {
 						return err1
@@ -369,8 +369,8 @@ func (db *DB) Zincr(name, key string, step int64) (int64, error) {
 	var score int64
 
 	keyB := []byte(key)
-	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
-	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
+	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, []byte(name)})
 
 	err := db.DB.Update(func(tx *bolt.Tx) error {
 		b1, err1 := tx.CreateBucketIfNotExists(keyBucket)
@@ -398,7 +398,7 @@ func (db *DB) Zincr(name, key string, step int64) (int64, error) {
 
 		score += step
 		newScoreB := Itob(score)
-		newKey := bconcat([][]byte{newScoreB, keyB})
+		newKey := Bconcat([][]byte{newScoreB, keyB})
 
 		err1 = b1.Put(newKey, []byte{})
 		if err1 != nil {
@@ -411,7 +411,7 @@ func (db *DB) Zincr(name, key string, step int64) (int64, error) {
 		}
 
 		if vOld != nil {
-			oldKey := bconcat([][]byte{vOld, keyB})
+			oldKey := Bconcat([][]byte{vOld, keyB})
 			err1 = b1.Delete(oldKey)
 			if err1 != nil {
 				return err1
@@ -424,8 +424,8 @@ func (db *DB) Zincr(name, key string, step int64) (int64, error) {
 
 func (db *DB) Zdel(name, key string) error {
 	keyB := []byte(key)
-	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
-	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
+	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
 		b1 := tx.Bucket(keyBucket)
 		if b1 == nil {
@@ -438,7 +438,7 @@ func (db *DB) Zdel(name, key string) error {
 
 		oldScore := b2.Get(keyB)
 		if oldScore != nil {
-			oldKey := bconcat([][]byte{oldScore, keyB})
+			oldKey := Bconcat([][]byte{oldScore, keyB})
 			err := b1.Delete(oldKey)
 			if err != nil {
 				return err
@@ -450,8 +450,8 @@ func (db *DB) Zdel(name, key string) error {
 }
 
 func (db *DB) ZdelBucket(name string) error {
-	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
-	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
+	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket(keyBucket)
 		if err != nil {
@@ -466,7 +466,7 @@ func (db *DB) Zget(name, key string) *ZetReply {
 		State: replyError,
 		Data:  []*ZetEntry{},
 	}
-	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, []byte(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(scoreBucket)
 		if b == nil {
@@ -492,7 +492,7 @@ func (db *DB) Zmget(name string, keys []string) *ZetReply {
 		State: replyError,
 		Data:  []*ZetEntry{},
 	}
-	scoreBucket := bconcat([][]byte{zetScorePrefix, []byte(name)})
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, []byte(name)})
 
 	err := db.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(scoreBucket)
@@ -520,7 +520,7 @@ func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 		State: replyError,
 		Data:  []*ZetEntry{},
 	}
-	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
+	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
 
 	startScore := scoreMin
 	if len(scoreStart) > 0 {
@@ -532,7 +532,7 @@ func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 	}
 
 	scoreStartB := Itob(startScore)
-	startScoreKeyB := bconcat([][]byte{scoreStartB, []byte(keyStart)})
+	startScoreKeyB := Bconcat([][]byte{scoreStartB, []byte(keyStart)})
 
 	err := db.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(keyBucket)
@@ -564,7 +564,7 @@ func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 		State: replyError,
 		Data:  []*ZetEntry{},
 	}
-	keyBucket := bconcat([][]byte{zetKeyPrefix, []byte(name)})
+	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
 
 	startScore := scoreMax
 	if len(scoreStart) > 0 {
@@ -581,7 +581,7 @@ func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 	}
 
 	scoreStartB := Itob(startScore)
-	startScoreKeyB := bconcat([][]byte{scoreStartB, []byte(startKey)})
+	startScoreKeyB := Bconcat([][]byte{scoreStartB, []byte(startKey)})
 
 	err := db.DB.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(keyBucket)
@@ -731,7 +731,7 @@ func (r *ZetEntry) ValInt() int {
 
 // ----- util func ----
 
-func bconcat(slices [][]byte) []byte {
+func Bconcat(slices [][]byte) []byte {
 	var totalLen int
 	for _, s := range slices {
 		totalLen += len(s)
