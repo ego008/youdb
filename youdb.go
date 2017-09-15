@@ -1,6 +1,4 @@
-/*
-Package youdb is a Bolt wrapper that allows easy store hash, zset data.
-*/
+// Package youdb is a Bolt wrapper that allows easy store hash, zset data.
 package youdb
 
 import (
@@ -15,46 +13,52 @@ import (
 )
 
 const (
-	replyOK          string = "ok"
-	replyNotFound    string = "not_found"
-	replyError       string = "error"
-	replyClientError string = "client_error"
-	scoreMin         int64  = 0
-	scoreMax         int64  = 9223372036854775807 // uint64
+	replyOK                = "ok"
+	replyNotFound          = "not_found"
+	replyError             = "error"
+	replyClientError       = "client_error"
+	scoreMin         int64 = 0
+	scoreMax         int64 = 9223372036854775807
 )
 
 var (
-	hashPrefix     []byte = []byte{30} // hash map
-	zetKeyPrefix   []byte = []byte{31} // [score+key]->nil
-	zetScorePrefix []byte = []byte{29} // [key]->score
+	hashPrefix     = []byte{30}
+	zetKeyPrefix   = []byte{31}
+	zetScorePrefix = []byte{29}
 )
 
 type (
+	// DB embeds a bolt.DB
 	DB struct {
 		*bolt.DB
 	}
 
+	// Entry represents a holder for a key value pair of a hashmap
 	Entry struct {
-		Key string
+		Key   string
 		Value []byte
 	}
 
+	// Reply a holder for a Entry list of a hashmap
 	Reply struct {
 		State string
 		Data  []*Entry
 	}
 
+	// ZetEntry represents a holder for a key value pair of a zet
 	ZetEntry struct {
 		Key   string
 		Value int64
 	}
 
+	// ZetReply a holder for a ZetEntry list of a zet
 	ZetReply struct {
 		State string
 		Data  []*ZetEntry
 	}
 )
 
+// Open creates/opens a bolt.DB at specified path, and returns a DB enclosing the same
 func Open(path string) (*DB, error) {
 	database, err := bolt.Open(path, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
@@ -66,12 +70,12 @@ func Open(path string) (*DB, error) {
 	return &db, nil
 }
 
+// Close closes the embedded bolt.DB
 func (db *DB) Close() error {
 	return db.DB.Close()
 }
 
-// --- hash ------
-
+// Hset set the byte value in argument as value of the key of a hashmap
 func (db *DB) Hset(name, key string, val []byte) error {
 	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
@@ -83,6 +87,7 @@ func (db *DB) Hset(name, key string, val []byte) error {
 	})
 }
 
+// Hmset set multiple key-value pairs(map) of a hashmap in one method call
 func (db *DB) Hmset(name string, kv map[string][]byte) error {
 	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
@@ -100,6 +105,7 @@ func (db *DB) Hmset(name string, kv map[string][]byte) error {
 	})
 }
 
+// Hincr increment the number stored at key in a hashmap by step
 func (db *DB) Hincr(name, key string, step int64) (int64, error) {
 	var i int64
 	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
@@ -134,6 +140,7 @@ func (db *DB) Hincr(name, key string, step int64) (int64, error) {
 	return i, err
 }
 
+// Hdel delete specified key of a hashmap
 func (db *DB) Hdel(name, key string) error {
 	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
@@ -145,6 +152,7 @@ func (db *DB) Hdel(name, key string) error {
 	})
 }
 
+// HdelBucket delete all keys in a hashmap
 func (db *DB) HdelBucket(name string) error {
 	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
@@ -152,6 +160,7 @@ func (db *DB) HdelBucket(name string) error {
 	})
 }
 
+// Hget get the value related to the specified key of a hashmap
 func (db *DB) Hget(name, key string) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -178,6 +187,7 @@ func (db *DB) Hget(name, key string) *Reply {
 	return r
 }
 
+// Hmget get the values related to the specified multiple keys of a hashmap
 func (db *DB) Hmget(name string, keys []string) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -204,6 +214,7 @@ func (db *DB) Hmget(name string, keys []string) *Reply {
 	return r
 }
 
+// Hscan list key-value pairs of a hashmap with keys in range (key_start, key_end]
 func (db *DB) Hscan(name, keyStart string, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -238,6 +249,7 @@ func (db *DB) Hscan(name, keyStart string, limit int) *Reply {
 	return r
 }
 
+// Hrscan list key-value pairs of a hashmap with keys in range (key_start, key_end], in reverse order
 func (db *DB) Hrscan(name, keyStart string, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -275,8 +287,7 @@ func (db *DB) Hrscan(name, keyStart string, limit int) *Reply {
 	return r
 }
 
-// ---- zet ----
-
+// Zset set the score of the key of a zset
 func (db *DB) Zset(name, key string, val int64) error {
 	score := Itob(val)
 	keyB := []byte(key)
@@ -317,6 +328,7 @@ func (db *DB) Zset(name, key string, val int64) error {
 	})
 }
 
+// Zmset et multiple key-score pairs(map) of a zset in one method call
 func (db *DB) Zmset(name string, kv map[string]int64) error {
 	newKv := map[string][]byte{}
 	for k, v := range kv {
@@ -365,6 +377,7 @@ func (db *DB) Zmset(name string, kv map[string]int64) error {
 	})
 }
 
+// Zincr increment the number stored at key in a zset by step
 func (db *DB) Zincr(name, key string, step int64) (int64, error) {
 	var score int64
 
@@ -422,6 +435,7 @@ func (db *DB) Zincr(name, key string, step int64) (int64, error) {
 	return score, err
 }
 
+// Zdel delete specified key of a zset
 func (db *DB) Zdel(name, key string) error {
 	keyB := []byte(key)
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
@@ -449,6 +463,7 @@ func (db *DB) Zdel(name, key string) error {
 	})
 }
 
+// ZdelBucket delete all keys in a zset
 func (db *DB) ZdelBucket(name string) error {
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
 	scoreBucket := Bconcat([][]byte{zetScorePrefix, []byte(name)})
@@ -461,6 +476,7 @@ func (db *DB) ZdelBucket(name string) error {
 	})
 }
 
+// Zget get the score related to the specified key of a zset
 func (db *DB) Zget(name, key string) *ZetReply {
 	r := &ZetReply{
 		State: replyError,
@@ -487,6 +503,7 @@ func (db *DB) Zget(name, key string) *ZetReply {
 	return r
 }
 
+// Zmget get the values related to the specified multiple keys of a zset
 func (db *DB) Zmget(name string, keys []string) *ZetReply {
 	r := &ZetReply{
 		State: replyError,
@@ -515,6 +532,7 @@ func (db *DB) Zmget(name string, keys []string) *ZetReply {
 	return r
 }
 
+// Zscan list key-score pairs in a zset, where key-score in range (key_start+score_start, score_end]
 func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 	r := &ZetReply{
 		State: replyError,
@@ -559,6 +577,7 @@ func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 	return r
 }
 
+// Zrscan list key-score pairs of a zset, in reverse order
 func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 	r := &ZetReply{
 		State: replyError,
@@ -615,8 +634,7 @@ func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 	return r
 }
 
-// Reply method
-
+// String is a convenience wrapper over Get for string value of a hashmap
 func (r *Reply) String() string {
 	if len(r.Data) > 0 {
 		return string(r.Data[0].Value)
@@ -624,10 +642,12 @@ func (r *Reply) String() string {
 	return ""
 }
 
+// Int is a convenience wrapper over Get for int value of a hashmap
 func (r *Reply) Int() int {
 	return int(r.Int64())
 }
 
+// Int64 is a convenience wrapper over Get for int64 value of a hashmap
 func (r *Reply) Int64() int64 {
 	if len(r.Data) < 1 {
 		return 0
@@ -635,10 +655,12 @@ func (r *Reply) Int64() int64 {
 	return int64(r.Uint64())
 }
 
+// Uint is a convenience wrapper over Get for uint value of a hashmap
 func (r *Reply) Uint() uint {
 	return uint(r.Uint64())
 }
 
+// Uint64 is a convenience wrapper over Get for uint64 value of a hashmap
 func (r *Reply) Uint64() uint64 {
 	if len(r.Data) < 1 {
 		return 0
@@ -649,6 +671,7 @@ func (r *Reply) Uint64() uint64 {
 	return binary.BigEndian.Uint64(r.Data[0].Value)
 }
 
+// Dict retrieves the key/value pairs from reply of a hashmap
 func (r *Reply) Dict() map[string][]byte {
 	dict := make(map[string][]byte)
 	if len(r.Data) < 1 {
@@ -660,21 +683,26 @@ func (r *Reply) Dict() map[string][]byte {
 	return dict
 }
 
-func (r *Reply) Json(v interface{}) error {
+// JSON parses the JSON-encoded Reply Entry value and stores the result
+// in the value pointed to by v
+func (r *Reply) JSON(v interface{}) error {
 	return json.Unmarshal(r.Data[0].Value, &v)
 }
 
+// String return String value of a zet
 func (r *ZetReply) String() string {
 	if len(r.Data) > 0 {
-		return strconv.FormatInt(r.Data[0].Value,10)
+		return strconv.FormatInt(r.Data[0].Value, 10)
 	}
 	return ""
 }
 
+// Int return int value of a zet
 func (r *ZetReply) Int() int {
 	return int(r.Int64())
 }
 
+// Int64 return int64 value of a zet
 func (r *ZetReply) Int64() int64 {
 	if len(r.Data) < 1 {
 		return 0
@@ -682,10 +710,12 @@ func (r *ZetReply) Int64() int64 {
 	return int64(r.Uint64())
 }
 
+// Uint return uint value of a zet
 func (r *ZetReply) Uint() uint {
 	return uint(r.Uint64())
 }
 
+// Uint64 return uint64 value of a zet
 func (r *ZetReply) Uint64() uint64 {
 	if len(r.Data) < 1 {
 		return 0
@@ -693,6 +723,7 @@ func (r *ZetReply) Uint64() uint64 {
 	return uint64(r.Data[0].Value)
 }
 
+// Dict retrieves the key/value pairs from reply of a zet
 func (r *ZetReply) Dict() map[string]int64 {
 	dict := make(map[string]int64)
 	if len(r.Data) < 1 {
@@ -704,12 +735,12 @@ func (r *ZetReply) Dict() map[string]int64 {
 	return dict
 }
 
-// Entry method
-
+// ValStr return string of Entry value
 func (r *Entry) ValStr() string {
 	return string(r.Value)
 }
 
+// ValInt64 return int64 of Entry value
 func (r *Entry) ValInt64() int64 {
 	if len(r.Value) < 8 {
 		return -1
@@ -717,20 +748,23 @@ func (r *Entry) ValInt64() int64 {
 	return int64(binary.BigEndian.Uint64(r.Value))
 }
 
-func (r *Entry) Json(v interface{}) error {
+// JSON parses the JSON-encoded Entry value and stores the result
+// in the value pointed to by v
+func (r *Entry) JSON(v interface{}) error {
 	return json.Unmarshal(r.Value, v)
 }
 
+// ValStr return string of ZetEntry value
 func (r *ZetEntry) ValStr() string {
-	return strconv.FormatInt(r.Value,10)
+	return strconv.FormatInt(r.Value, 10)
 }
 
+// ValInt return int of ZetEntry value
 func (r *ZetEntry) ValInt() int {
 	return int(r.Value)
 }
 
-// ----- util func ----
-
+// Bconcat concat a list of byte
 func Bconcat(slices [][]byte) []byte {
 	var totalLen int
 	for _, s := range slices {
@@ -744,12 +778,14 @@ func Bconcat(slices [][]byte) []byte {
 	return tmp
 }
 
+// Itob returns an 8-byte big endian representation of v
 func Itob(v int64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, uint64(v))
 	return b
 }
 
+// Btoi return an int64 of v
 func Btoi(v []byte) int64 {
 	return int64(binary.BigEndian.Uint64(v))
 }
