@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	replyOK                = "ok"
-	replyNotFound          = "not_found"
-	replyError             = "error"
-	replyClientError       = "client_error"
-	scoreMin         int64 = 0
-	scoreMax         int64 = 9223372036854775807
+	replyOK                 = "ok"
+	replyNotFound           = "not_found"
+	replyError              = "error"
+	replyClientError        = "client_error"
+	scoreMin         uint64 = 0
+	scoreMax         uint64 = 18446744073709551615
 )
 
 var (
@@ -48,7 +48,7 @@ type (
 	// ZetEntry represents a holder for a key value pair of a zet
 	ZetEntry struct {
 		Key   string
-		Value int64
+		Value uint64
 	}
 
 	// ZetReply a holder for a ZetEntry list of a zet
@@ -106,15 +106,15 @@ func (db *DB) Hmset(name string, kv map[string][]byte) error {
 }
 
 // Hincr increment the number stored at key in a hashmap by step
-func (db *DB) Hincr(name, key string, step int64) (int64, error) {
-	var i int64
+func (db *DB) Hincr(name, key string, step uint64) (uint64, error) {
+	var i uint64
 	bucketName := Bconcat([][]byte{hashPrefix, []byte(name)})
 	err := db.DB.Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(bucketName)
 		if err != nil {
 			return err
 		}
-		var oldNum int64
+		var oldNum uint64
 		v := b.Get([]byte(key))
 		if len(v) > 0 {
 			oldNum = Btoi(v)
@@ -288,7 +288,7 @@ func (db *DB) Hrscan(name, keyStart string, limit int) *Reply {
 }
 
 // Zset set the score of the key of a zset
-func (db *DB) Zset(name, key string, val int64) error {
+func (db *DB) Zset(name, key string, val uint64) error {
 	score := Itob(val)
 	keyB := []byte(key)
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
@@ -329,7 +329,7 @@ func (db *DB) Zset(name, key string, val int64) error {
 }
 
 // Zmset et multiple key-score pairs(map) of a zset in one method call
-func (db *DB) Zmset(name string, kv map[string]int64) error {
+func (db *DB) Zmset(name string, kv map[string]uint64) error {
 	newKv := map[string][]byte{}
 	for k, v := range kv {
 		newKv[k] = Itob(v)
@@ -378,8 +378,8 @@ func (db *DB) Zmset(name string, kv map[string]int64) error {
 }
 
 // Zincr increment the number stored at key in a zset by step
-func (db *DB) Zincr(name, key string, step int64) (int64, error) {
-	var score int64
+func (db *DB) Zincr(name, key string, step uint64) (uint64, error) {
+	var score uint64
 
 	keyB := []byte(key)
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, []byte(name)})
@@ -491,7 +491,7 @@ func (db *DB) Zget(name, key string) *ZetReply {
 		v := b.Get([]byte(key))
 		if v != nil {
 			r.State = replyOK
-			r.Data = append(r.Data, &ZetEntry{key, int64(binary.BigEndian.Uint64(v))})
+			r.Data = append(r.Data, &ZetEntry{key, binary.BigEndian.Uint64(v)})
 		} else {
 			r.State = replyNotFound
 		}
@@ -520,7 +520,7 @@ func (db *DB) Zmget(name string, keys []string) *ZetReply {
 			k := []byte(key)
 			v := b.Get(k)
 			if v != nil {
-				r.Data = append(r.Data, &ZetEntry{key, int64(binary.BigEndian.Uint64(v))})
+				r.Data = append(r.Data, &ZetEntry{key, binary.BigEndian.Uint64(v)})
 			}
 		}
 
@@ -542,7 +542,7 @@ func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 
 	startScore := scoreMin
 	if len(scoreStart) > 0 {
-		i, err := strconv.ParseInt(scoreStart, 10, 64)
+		i, err := strconv.ParseUint(scoreStart, 10, 64)
 		if err != nil {
 			return r
 		}
@@ -563,7 +563,7 @@ func (db *DB) Zscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 		for k, _ := c.Seek(scoreStartB); k != nil; k, _ = c.Next() {
 			if bytes.Compare(k, startScoreKeyB) == 1 {
 				n++
-				r.Data = append(r.Data, &ZetEntry{string(k[8:]), int64(binary.BigEndian.Uint64(k[0:8]))})
+				r.Data = append(r.Data, &ZetEntry{string(k[8:]), binary.BigEndian.Uint64(k[0:8])})
 				if n == limit {
 					break
 				}
@@ -587,7 +587,7 @@ func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 
 	startScore := scoreMax
 	if len(scoreStart) > 0 {
-		i, err := strconv.ParseInt(scoreStart, 10, 64)
+		i, err := strconv.ParseUint(scoreStart, 10, 64)
 		if err != nil {
 			return r
 		}
@@ -620,7 +620,7 @@ func (db *DB) Zrscan(name, keyStart, scoreStart string, limit int) *ZetReply {
 		for k, _ := k0, v0; k != nil; k, _ = c.Prev() {
 			if bytes.Compare(k, startScoreKeyB) == -1 {
 				n++
-				r.Data = append(r.Data, &ZetEntry{string(k[8:]), int64(binary.BigEndian.Uint64(k[0:8]))})
+				r.Data = append(r.Data, &ZetEntry{string(k[8:]), binary.BigEndian.Uint64(k[0:8])})
 				if n == limit {
 					break
 				}
@@ -692,7 +692,7 @@ func (r *Reply) JSON(v interface{}) error {
 // String return String value of a zet
 func (r *ZetReply) String() string {
 	if len(r.Data) > 0 {
-		return strconv.FormatInt(r.Data[0].Value, 10)
+		return strconv.FormatUint(r.Data[0].Value, 10)
 	}
 	return ""
 }
@@ -724,8 +724,8 @@ func (r *ZetReply) Uint64() uint64 {
 }
 
 // Dict retrieves the key/value pairs from reply of a zet
-func (r *ZetReply) Dict() map[string]int64 {
-	dict := make(map[string]int64)
+func (r *ZetReply) Dict() map[string]uint64 {
+	dict := make(map[string]uint64)
 	if len(r.Data) < 1 {
 		return dict
 	}
@@ -756,7 +756,7 @@ func (r *Entry) JSON(v interface{}) error {
 
 // ValStr return string of ZetEntry value
 func (r *ZetEntry) ValStr() string {
-	return strconv.FormatInt(r.Value, 10)
+	return strconv.FormatUint(r.Value, 10)
 }
 
 // ValInt return int of ZetEntry value
@@ -779,13 +779,13 @@ func Bconcat(slices [][]byte) []byte {
 }
 
 // Itob returns an 8-byte big endian representation of v
-func Itob(v int64) []byte {
+func Itob(v uint64) []byte {
 	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(v))
+	binary.BigEndian.PutUint64(b, v)
 	return b
 }
 
 // Btoi return an int64 of v
-func Btoi(v []byte) int64 {
-	return int64(binary.BigEndian.Uint64(v))
+func Btoi(v []byte) uint64 {
+	return binary.BigEndian.Uint64(v)
 }
