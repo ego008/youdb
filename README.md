@@ -27,46 +27,56 @@ func main() {
 
 	// hash
 
-	db.Hset("mytest", "key1", []byte("value1"))
+	db.Hset("mytest", []byte("key1"), []byte("value1"))
 
-	rs := db.Hget("mytest", "key1")
+	rs := db.Hget("mytest", []byte("key1"))
 	if rs.State == "ok" {
 		fmt.Println(rs.Data[0], rs.String())
 	} else {
 		fmt.Println("key not found")
 	}
 
-	dataMap := map[string][]byte{}
-	dataMap["k1"] = []byte("12987887762987")
-	dataMap["k2"] = []byte("abc")
-	dataMap["k3"] = []byte("qwertyui")
-	dataMap["k4"] = []byte("aaaa")
-	dataMap["k5"] = []byte("aaaa555")
-	dataMap["k6"] = []byte("aaaa556")
-	dataMap["k7"] = []byte("77777")
-	dataMap["k8"] = []byte("88888")
+	data := [][]byte{}
+	data = append(data, []byte("k1"), []byte("12987887762987"))
+	data = append(data, []byte("k2"), []byte("abc"))
+	data = append(data, []byte("k3"), []byte("qwasww"))
+	data = append(data, []byte("k4"), []byte("444"))
+	data = append(data, []byte("k5"), []byte("555"))
+	data = append(data, []byte("k6"), []byte("aaaa556"))
+	data = append(data, []byte("k7"), []byte("77777"))
+	data = append(data, []byte("k8"), []byte("88888"))
 
-	db.Hmset("myhmset", dataMap)
+	db.Hmset("myhmset", data...)
 
-	rs = db.Hmget("myhmset", []string{"k1", "k2", "k3", "k8"})
+	rs = db.Hmget("myhmset", [][]byte{[]byte("k1"), []byte("k2"), []byte("k3"), []byte("k4")})
 	if rs.State == "ok" {
-		for _, v := range rs.Data {
-			fmt.Println(v.Key, v.ValStr())
+		for _, v := range rs.List() {
+			fmt.Println(v.Key.String(), v.Value.String())
 		}
 	}
 
-	fmt.Println(db.Hincr("num", "k1", 2))
+	fmt.Println(db.Hincr("num", []byte("k1"), 2))
+
+	k, _ := youdb.DS2b("19822112")
+	v := uint64(121211121212233)
+	db.Hset("mytestnum", k, youdb.I2b(v))
+	r := db.Hget("mytestnum2", k)
+	if r.State == "ok" {
+		fmt.Println(r.Int64(), r.Data[0].Int64(), string(r.Data[0]))
+	} else {
+		fmt.Println(r.State, r.Int64())
+	}
 
 	// zet
 
-	db.Zset("mytest", "key1", 100)
+	db.Zset("mytest", []byte("key1"), 100)
 
-	rs2 := db.Zget("mytest", "key1")
+	rs2 := db.Zget("mytest", []byte("key1"))
 	if rs2.State == "ok" {
 		fmt.Println(rs2.Int64())
 	}
 
-	fmt.Println(db.Zincr("num", "k1", 2))
+	fmt.Println(db.Zincr("num", []byte("k1"), 2))
 }
 ```
 
