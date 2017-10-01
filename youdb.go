@@ -531,7 +531,7 @@ func (db *DB) Zscan(name string, keyStart, scoreStart []byte, limit int) *Reply 
 
 	scoreStartB := I2b(scoreMin)
 	if len(scoreStart) > 0 {
-		scoreStartB := make([]byte, len(scoreStart))
+		scoreStartB = make([]byte, len(scoreStart))
 		copy(scoreStartB, scoreStart)
 	}
 
@@ -579,7 +579,7 @@ func (db *DB) Zrscan(name string, keyStart, scoreStart []byte, limit int) *Reply
 
 	scoreStartB := I2b(scoreMax)
 	if len(scoreStart) > 0 {
-		scoreStartB := make([]byte, len(scoreStart))
+		scoreStartB = make([]byte, len(scoreStart))
 		copy(scoreStartB, scoreStart)
 	}
 
@@ -740,6 +740,16 @@ func DS2b(v string) ([]byte, error) {
 		return nil, err
 	}
 	return I2b(i), nil
+}
+
+// DS2i returns uint64 of Digit string
+// v ("123456") -> uint64(123456)
+func DS2i(v string) uint64 {
+	i, err := strconv.ParseUint(v, 10, 64)
+	if err != nil {
+		return uint64(0)
+	}
+	return i
 }
 
 // Itob returns an 8-byte big endian representation of v
