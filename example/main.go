@@ -24,7 +24,7 @@ func main() {
 		fmt.Println("key not found")
 	}
 
-	data := [][]byte{}
+	var data [][]byte
 	data = append(data, []byte("k1"), []byte("12987887762987"))
 	data = append(data, []byte("k2"), []byte("abc"))
 	data = append(data, []byte("k3"), []byte("qwasww"))
@@ -43,9 +43,23 @@ func main() {
 		}
 	}
 
+	db.Hset("new2", []byte("123456783:abcd:xzaksas"), []byte("value1"))
+	db.Hset("new2", []byte("123456781:zsabcd:xzaksas"), []byte("value1"))
+	db.Hset("new2", []byte("123456782:1q23wqwqqw:xzaksa3"), []byte("value1"))
+
+	rs = db.Hscan("new2", []byte(""), 4)
+	for k, v := range rs.List() {
+		fmt.Println(k, v.Key.String(), v.Value.String())
+	}
+
+	rs = db.Hscan("new2", []byte("123456781"), 4)
+	for k, v := range rs.List() {
+		fmt.Println(k, v.Key.String(), v.Value.String())
+	}
+
 	fmt.Println(db.Hincr("num", []byte("k1"), 2))
 
-	k, _ := youdb.DS2b("19822112")
+	k := youdb.DS2b("19822112")
 	v := uint64(121211121212233)
 	db.Hset("mytestnum", k, youdb.I2b(v))
 	r := db.Hget("mytestnum2", k)
@@ -64,5 +78,33 @@ func main() {
 		fmt.Println(rs2.Int64())
 	}
 
+	kk := []byte("b7hko2sfm7j6h5r83fg0:click:40701bdbd9dca8bd62cb446ed1654b8d")
+	db.Zset("tt2", kk, 2)
+	fmt.Println("new get:", db.Zget("tt2", kk).State)
+	if rr := db.Zget("tt2", kk); rr.State == "ok" {
+		fmt.Println("okkk")
+	}
+
 	fmt.Println(db.Zincr("num", []byte("k1"), 2))
+
+	db.Zset("test", youdb.I2b(2017), 5002)
+	db.Zset("test", youdb.I2b(2018), 5001)
+	db.Zset("test", youdb.I2b(2016), 4999)
+	db.Zset("test", youdb.I2b(2011), 4000)
+
+	rs = db.Zscan("test", youdb.I2b(2016), youdb.I2b(4999), 2)
+	fmt.Println(youdb.B2i(rs.Data[0]), youdb.B2i(rs.Data[1]))
+
+	db.Zset("test2", []byte("2017"), 5002)
+	db.Zset("test2", []byte("2018"), 5001)
+	db.Zset("test2", []byte("2016"), 4999)
+	db.Zset("test2", []byte("2011"), 4000)
+
+	fmt.Println("------")
+	rs = db.Zscan("test2", []byte("2017"), youdb.I2b(5000), 2)
+	fmt.Println(string(rs.Data[0]), youdb.B2i(rs.Data[1]))
+
+	//rs = db.Zrscan("test", youdb.I2b(2017), youdb.I2b(5002), 1)
+	//fmt.Println(youdb.B2i(rs.Data[0]), youdb.B2i(rs.Data[1]))
+	fmt.Println(db.HnextSequence("test3"))
 }

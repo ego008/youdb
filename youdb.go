@@ -32,24 +32,24 @@ var (
 
 type (
 	bs []byte
-	// DB embeds a bolt.DB
+	// DB embeds a bolt.DB.
 	DB struct {
 		*bolt.DB
 	}
 
-	// Reply a holder for a Entry list of a hashmap
+	// Reply a holder for a Entry list of a hashmap.
 	Reply struct {
 		State string
 		Data  []bs
 	}
 
-	// Entry a key-value pair
+	// Entry a key-value pair.
 	Entry struct {
 		Key, Value bs
 	}
 )
 
-// Open creates/opens a bolt.DB at specified path, and returns a DB enclosing the same
+// Open creates/opens a bolt.DB at specified path, and returns a DB enclosing the same.
 func Open(path string) (*DB, error) {
 	database, err := bolt.Open(path, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
@@ -61,52 +61,64 @@ func Open(path string) (*DB, error) {
 	return &db, nil
 }
 
-// Close closes the embedded bolt.DB
+// Close closes the embedded bolt.DB.
 func (db *DB) Close() error {
 	return db.DB.Close()
 }
 
-// Hset set the byte value in argument as value of the key of a hashmap
+// Hset set the byte value in argument as value of the key of a hashmap.
 func (db *DB) Hset(name string, key, val []byte) error {
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(bucketName)
-		if err != nil {
-			return err
+		b := tx.Bucket(bucketName)
+		if b == nil {
+			var err error
+			b, err = tx.CreateBucket(bucketName)
+			if err != nil {
+				return err
+			}
 		}
 		return b.Put(key, val)
 	})
 }
 
-// Hmset set multiple key-value pairs of a hashmap in one method call
+// Hmset set multiple key-value pairs of a hashmap in one method call.
 func (db *DB) Hmset(name string, kvs ...[]byte) error {
 	if len(kvs) == 0 || len(kvs)%2 != 0 {
 		return errors.New("kvs len must is an even number")
 	}
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(bucketName)
-		if err != nil {
-			return err
-		}
-		for i := 0; i < (len(kvs) - 1); i += 2 {
-			err := b.Put(kvs[i], kvs[i+1])
+		var err error
+		b := tx.Bucket(bucketName)
+		if b == nil {
+			b, err = tx.CreateBucket(bucketName)
 			if err != nil {
 				return err
 			}
 		}
-		return nil
+		for i := 0; i < (len(kvs) - 1); i += 2 {
+			err = b.Put(kvs[i], kvs[i+1])
+			if err != nil {
+				return err
+			}
+		}
+		return err
 	})
 }
 
-// Hincr increment the number stored at key in a hashmap by step
-func (db *DB) Hincr(name string, key []byte, step uint64) (uint64, error) {
+// Hincr increment the number stored at key in a hashmap by step.
+func (db *DB) Hincr(name string, key []byte, step int64) (uint64, error) {
 	var i uint64
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	err := db.DB.Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(bucketName)
-		if err != nil {
-			return err
+		b := tx.Bucket(bucketName)
+		if b == nil {
+			var err error
+			b, err = tx.CreateBucket(bucketName)
+			if err != nil {
+				return err
+			}
 		}
 		var oldNum uint64
 		v := b.Get(key)
@@ -114,17 +126,18 @@ func (db *DB) Hincr(name string, key []byte, step uint64) (uint64, error) {
 			oldNum = B2i(v)
 		}
 		if step > 0 {
-			if (scoreMax - step) < oldNum {
+			if (scoreMax - uint64(step)) < oldNum {
 				return errors.New("overflow number")
 			}
+			oldNum += uint64(step)
 		} else {
-			if (oldNum + step) < scoreMin {
+			if (oldNum - uint64(-step)) < scoreMin {
 				return errors.New("overflow number")
 			}
+			oldNum = uint64(-step)
 		}
 
-		oldNum += step
-		err = b.Put(key, I2b(oldNum))
+		err := b.Put(key, I2b(oldNum))
 		if err != nil {
 			return err
 		}
@@ -134,7 +147,7 @@ func (db *DB) Hincr(name string, key []byte, step uint64) (uint64, error) {
 	return i, err
 }
 
-// Hdel delete specified key of a hashmap
+// Hdel delete specified key of a hashmap.
 func (db *DB) Hdel(name string, key []byte) error {
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
@@ -146,7 +159,21 @@ func (db *DB) Hdel(name string, key []byte) error {
 	})
 }
 
-// HdelBucket delete all keys in a hashmap
+// Hmdel delete specified multiple keys of a hashmap.
+func (db *DB) Hmdel(name string, keys [][]byte) error {
+	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
+	return db.DB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketName)
+		if b != nil {
+			for _, key := range keys {
+				b.Delete(key)
+			}
+		}
+		return nil
+	})
+}
+
+// HdelBucket delete all keys in a hashmap.
 func (db *DB) HdelBucket(name string) error {
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	return db.DB.Update(func(tx *bolt.Tx) error {
@@ -154,7 +181,7 @@ func (db *DB) HdelBucket(name string) error {
 	})
 }
 
-// Hget get the value related to the specified key of a hashmap
+// Hget get the value related to the specified key of a hashmap.
 func (db *DB) Hget(name string, key []byte) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -180,7 +207,63 @@ func (db *DB) Hget(name string, key []byte) *Reply {
 	return r
 }
 
-// Hmget get the values related to the specified multiple keys of a hashmap
+// Hsequence returns the current integer for the bucket without incrementing it.
+func (db *DB) Hsequence(name string) uint64 {
+	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
+	var sequence uint64
+	db.DB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketName)
+		if b == nil {
+			return errors.New(bucketNotFound)
+		}
+		sequence = b.Sequence()
+		return nil
+	})
+	return sequence
+}
+
+// HsetSequence updates the sequence number for the bucket.
+func (db *DB) HsetSequence(name string, v uint64) error {
+	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
+	return db.DB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketName)
+		if b == nil {
+			var err error
+			b, err = tx.CreateBucket(bucketName)
+			if err != nil {
+				return err
+			}
+		}
+		return b.SetSequence(v)
+	})
+}
+
+// HnextSequence updates the sequence number for the bucket.
+func (db *DB) HnextSequence(name string) (uint64, error) {
+	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
+	var sequence uint64
+	err := db.DB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketName)
+		if b == nil {
+			var err error
+			b, err = tx.CreateBucket(bucketName)
+			if err != nil {
+				return err
+			}
+		}
+		sequence2, err := b.NextSequence()
+		if err == nil {
+			sequence = sequence2
+		}
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	return sequence, nil
+}
+
+// Hmget get the values related to the specified multiple keys of a hashmap.
 func (db *DB) Hmget(name string, keys [][]byte) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -195,9 +278,11 @@ func (db *DB) Hmget(name string, keys [][]byte) *Reply {
 		for _, key := range keys {
 			v := b.Get(key)
 			if v != nil {
-				r.State = replyOK
 				r.Data = append(r.Data, key, v)
 			}
+		}
+		if len(r.Data) > 0 {
+			r.State = replyOK
 		}
 		return nil
 	})
@@ -207,7 +292,7 @@ func (db *DB) Hmget(name string, keys [][]byte) *Reply {
 	return r
 }
 
-// Hscan list key-value pairs of a hashmap with keys in range (key_start, key_end]
+// Hscan list key-value pairs of a hashmap with keys in range (key_start, key_end].
 func (db *DB) Hscan(name string, keyStart []byte, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -223,13 +308,15 @@ func (db *DB) Hscan(name string, keyStart []byte, limit int) *Reply {
 		n := 0
 		for k, v := c.Seek(keyStart); k != nil; k, v = c.Next() {
 			if bytes.Compare(k, keyStart) == 1 {
-				n++
-				r.State = replyOK
 				r.Data = append(r.Data, k, v)
+				n++
 				if n == limit {
 					break
 				}
 			}
+		}
+		if n > 0 {
+			r.State = replyOK
 		}
 		return nil
 	})
@@ -239,7 +326,7 @@ func (db *DB) Hscan(name string, keyStart []byte, limit int) *Reply {
 	return r
 }
 
-// Hrscan list key-value pairs of a hashmap with keys in range (key_start, key_end], in reverse order
+// Hrscan list key-value pairs of a hashmap with keys in range (key_start, key_end], in reverse order.
 func (db *DB) Hrscan(name string, keyStart []byte, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -251,9 +338,10 @@ func (db *DB) Hrscan(name string, keyStart []byte, limit int) *Reply {
 		if b == nil {
 			return errors.New(bucketNotFound)
 		}
+
 		c := b.Cursor()
-		n := 0
-		startKey, k0, v0 := []byte{255}, []byte{}, []byte{}
+		var startKey = []byte{255}
+		var k0, v0 []byte
 		if len(keyStart) > 0 {
 			startKey = make([]byte, len(keyStart))
 			copy(startKey, keyStart)
@@ -261,57 +349,69 @@ func (db *DB) Hrscan(name string, keyStart []byte, limit int) *Reply {
 		} else {
 			k0, v0 = c.Last()
 		}
+
+		n := 0
 		for k, v := k0, v0; k != nil; k, v = c.Prev() {
 			if bytes.Compare(k, startKey) == -1 {
-				n++
-				r.State = replyOK
 				r.Data = append(r.Data, k, v)
-				if n >= limit {
+				n++
+				if n == limit {
 					break
 				}
 			}
 		}
+		if len(r.Data) > 0 {
+			r.State = replyOK
+		}
 		return nil
 	})
-	if err == nil {
+	if err != nil {
 		r.State = err.Error()
 	}
 	return r
 }
 
-// Zset set the score of the key of a zset
+// Zset set the score of the key of a zset.
 func (db *DB) Zset(name string, key []byte, val uint64) error {
 	score := I2b(val)
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, S2b(name)})
 	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
 	newKey := Bconcat([][]byte{score, key})
 	return db.DB.Update(func(tx *bolt.Tx) error {
-		b1, err1 := tx.CreateBucketIfNotExists(keyBucket)
-		if err1 != nil {
-			return err1
+		var err error
+		b1 := tx.Bucket(keyBucket)
+		if b1 == nil {
+			b1, err = tx.CreateBucket(keyBucket)
+			if err != nil {
+				return err
+			}
 		}
-		b2, err2 := tx.CreateBucketIfNotExists(scoreBucket)
-		if err2 != nil {
-			return err2
+
+		b2 := tx.Bucket(scoreBucket)
+		if b2 == nil {
+			b2, err = tx.CreateBucket(scoreBucket)
+			if err != nil {
+				return err
+			}
 		}
 
 		oldScore := b2.Get(key)
 		if !bytes.Equal(oldScore, score) {
-			err1 = b1.Put(newKey, []byte{})
-			if err1 != nil {
-				return err1
+			err = b1.Put(newKey, []byte{})
+			if err != nil {
+				return err
 			}
 
-			err2 = b2.Put(key, score)
-			if err2 != nil {
-				return err2
+			err = b2.Put(key, score)
+			if err != nil {
+				return err
 			}
 
 			if oldScore != nil {
 				oldKey := Bconcat([][]byte{oldScore, key})
-				err1 = b1.Delete(oldKey)
-				if err1 != nil {
-					return err1
+				err = b1.Delete(oldKey)
+				if err != nil {
+					return err
 				}
 			}
 		}
@@ -319,7 +419,7 @@ func (db *DB) Zset(name string, key []byte, val uint64) error {
 	})
 }
 
-// Zmset et multiple key-score pairs of a zset in one method call
+// Zmset et multiple key-score pairs of a zset in one method call.
 func (db *DB) Zmset(name string, kvs ...[]byte) error {
 	if len(kvs) == 0 || len(kvs)%2 != 0 {
 		return errors.New("kvs len must is an even number")
@@ -329,13 +429,21 @@ func (db *DB) Zmset(name string, kvs ...[]byte) error {
 	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
 
 	return db.DB.Update(func(tx *bolt.Tx) error {
-		b1, err1 := tx.CreateBucketIfNotExists(keyBucket)
-		if err1 != nil {
-			return err1
+		var err error
+		b1 := tx.Bucket(keyBucket)
+		if b1 == nil {
+			b1, err = tx.CreateBucket(keyBucket)
+			if err != nil {
+				return err
+			}
 		}
-		b2, err2 := tx.CreateBucketIfNotExists(scoreBucket)
-		if err2 != nil {
-			return err2
+
+		b2 := tx.Bucket(scoreBucket)
+		if b2 == nil {
+			b2, err = tx.CreateBucket(scoreBucket)
+			if err != nil {
+				return err
+			}
 		}
 
 		for i := 0; i < (len(kvs) - 1); i += 2 {
@@ -345,21 +453,21 @@ func (db *DB) Zmset(name string, kvs ...[]byte) error {
 
 			oldScore := b2.Get(key)
 			if !bytes.Equal(oldScore, score) {
-				err1 = b1.Put(newKey, []byte(""))
-				if err1 != nil {
-					return err1
+				err = b1.Put(newKey, []byte(""))
+				if err != nil {
+					return err
 				}
 
-				err2 = b2.Put(key, score)
-				if err2 != nil {
-					return err2
+				err = b2.Put(key, score)
+				if err != nil {
+					return err
 				}
 
 				if oldScore != nil {
 					oldKey := Bconcat([][]byte{oldScore, key})
-					err1 = b1.Delete(oldKey)
-					if err1 != nil {
-						return err1
+					err = b1.Delete(oldKey)
+					if err != nil {
+						return err
 					}
 				}
 			}
@@ -368,21 +476,30 @@ func (db *DB) Zmset(name string, kvs ...[]byte) error {
 	})
 }
 
-// Zincr increment the number stored at key in a zset by step
-func (db *DB) Zincr(name string, key []byte, step uint64) (uint64, error) {
+// Zincr increment the number stored at key in a zset by step.
+func (db *DB) Zincr(name string, key []byte, step int64) (uint64, error) {
 	var score uint64
 
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, S2b(name)})
 	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
 
 	err := db.DB.Update(func(tx *bolt.Tx) error {
-		b1, err1 := tx.CreateBucketIfNotExists(keyBucket)
-		if err1 != nil {
-			return err1
+		var err error
+
+		b1 := tx.Bucket(keyBucket)
+		if b1 == nil {
+			b1, err = tx.CreateBucket(keyBucket)
+			if err != nil {
+				return err
+			}
 		}
-		b2, err2 := tx.CreateBucketIfNotExists(scoreBucket)
-		if err2 != nil {
-			return err2
+
+		b2 := tx.Bucket(scoreBucket)
+		if b2 == nil {
+			b2, err = tx.CreateBucket(scoreBucket)
+			if err != nil {
+				return err
+			}
 		}
 
 		vOld := b2.Get(key)
@@ -390,34 +507,35 @@ func (db *DB) Zincr(name string, key []byte, step uint64) (uint64, error) {
 			score = B2i(vOld)
 		}
 		if step > 0 {
-			if (scoreMax - step) < score {
+			if (scoreMax - uint64(step)) < score {
 				return errors.New("overflow number")
 			}
+			score += uint64(step)
 		} else {
-			if (score + step) < scoreMin {
+
+			if (score - uint64(-step)) < scoreMin {
 				return errors.New("overflow number")
 			}
+			score -= uint64(-step)
 		}
-
-		score += step
 		newScoreB := I2b(score)
 		newKey := Bconcat([][]byte{newScoreB, key})
 
-		err1 = b1.Put(newKey, []byte{})
-		if err1 != nil {
-			return err1
+		err = b1.Put(newKey, []byte{})
+		if err != nil {
+			return err
 		}
 
-		err2 = b2.Put(key, newScoreB)
-		if err2 != nil {
-			return err2
+		err = b2.Put(key, newScoreB)
+		if err != nil {
+			return err
 		}
 
 		if vOld != nil {
 			oldKey := Bconcat([][]byte{vOld, key})
-			err1 = b1.Delete(oldKey)
-			if err1 != nil {
-				return err1
+			err = b1.Delete(oldKey)
+			if err != nil {
+				return err
 			}
 		}
 		return nil
@@ -425,7 +543,7 @@ func (db *DB) Zincr(name string, key []byte, step uint64) (uint64, error) {
 	return score, err
 }
 
-// Zdel delete specified key of a zset
+// Zdel delete specified key of a zset.
 func (db *DB) Zdel(name string, key []byte) error {
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, S2b(name)})
 	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
@@ -452,7 +570,34 @@ func (db *DB) Zdel(name string, key []byte) error {
 	})
 }
 
-// ZdelBucket delete all keys in a zset
+// Zmdel delete specified multiple keys of a zset.
+func (db *DB) Zmdel(name string, keys [][]byte) error {
+	keyBucket := Bconcat([][]byte{zetKeyPrefix, S2b(name)})
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
+
+	return db.DB.Update(func(tx *bolt.Tx) error {
+		b1 := tx.Bucket(keyBucket)
+		if b1 == nil {
+			return nil
+		}
+		b2 := tx.Bucket(scoreBucket)
+		if b2 == nil {
+			return nil
+		}
+
+		for _, key := range keys {
+			oldScore := b2.Get(key)
+			if oldScore != nil {
+				oldKey := Bconcat([][]byte{oldScore, key})
+				b1.Delete(oldKey)
+				b2.Delete(key)
+			}
+		}
+		return nil
+	})
+}
+
+// ZdelBucket delete all keys in a zset.
 func (db *DB) ZdelBucket(name string) error {
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, S2b(name)})
 	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
@@ -465,7 +610,7 @@ func (db *DB) ZdelBucket(name string) error {
 	})
 }
 
-// Zget get the score related to the specified key of a zset
+// Zget get the score related to the specified key of a zset.
 func (db *DB) Zget(name string, key []byte) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -492,7 +637,63 @@ func (db *DB) Zget(name string, key []byte) *Reply {
 	return r
 }
 
-// Zmget get the values related to the specified multiple keys of a zset
+// Zsequence returns the current integer for the bucket without incrementing it.
+func (db *DB) Zsequence(name string) uint64 {
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
+	var sequence uint64
+	db.DB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(scoreBucket)
+		if b == nil {
+			return errors.New(bucketNotFound)
+		}
+		sequence = b.Sequence()
+		return nil
+	})
+	return sequence
+}
+
+// ZsetSequence updates the sequence number for the bucket.
+func (db *DB) ZsetSequence(name string, v uint64) error {
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
+	return db.DB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(scoreBucket)
+		if b == nil {
+			var err error
+			b, err = tx.CreateBucket(scoreBucket)
+			if err != nil {
+				return err
+			}
+		}
+		return b.SetSequence(v)
+	})
+}
+
+// ZnextSequence updates the sequence number for the bucket.
+func (db *DB) ZnextSequence(name string) (uint64, error) {
+	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
+	var sequence uint64
+	err := db.DB.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(scoreBucket)
+		if b == nil {
+			var err error
+			b, err = tx.CreateBucket(scoreBucket)
+			if err != nil {
+				return err
+			}
+		}
+		sequence2, err2 := b.NextSequence()
+		if err2 == nil {
+			sequence = sequence2
+		}
+		return err2
+	})
+	if err != nil {
+		return 0, err
+	}
+	return sequence, nil
+}
+
+// Zmget get the values related to the specified multiple keys of a zset.
 func (db *DB) Zmget(name string, keys [][]byte) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -508,11 +709,12 @@ func (db *DB) Zmget(name string, keys [][]byte) *Reply {
 		for _, key := range keys {
 			v := b.Get(key)
 			if v != nil {
-				r.State = replyOK
 				r.Data = append(r.Data, key, v)
 			}
 		}
-
+		if len(r.Data) > 0 {
+			r.State = replyOK
+		}
 		return nil
 	})
 	if err != nil {
@@ -521,7 +723,7 @@ func (db *DB) Zmget(name string, keys [][]byte) *Reply {
 	return r
 }
 
-// Zscan list key-score pairs in a zset, where key-score in range (key_start+score_start, score_end]
+// Zscan list key-score pairs in a zset, where key-score in range (key_start+score_start, score_end].
 func (db *DB) Zscan(name string, keyStart, scoreStart []byte, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -544,16 +746,18 @@ func (db *DB) Zscan(name string, keyStart, scoreStart []byte, limit int) *Reply 
 		}
 		c := b.Cursor()
 		n := 0
-		// c.Seek(scoreStartB) or c.Seek(startScoreKeyB)
+
 		for k, _ := c.Seek(scoreStartB); k != nil; k, _ = c.Next() {
 			if bytes.Compare(k, startScoreKeyB) == 1 {
-				n++
-				r.State = replyOK
 				r.Data = append(r.Data, k[8:], k[0:8])
+				n++
 				if n == limit {
 					break
 				}
 			}
+		}
+		if n > 0 {
+			r.State = replyOK
 		}
 		return nil
 	})
@@ -563,7 +767,7 @@ func (db *DB) Zscan(name string, keyStart, scoreStart []byte, limit int) *Reply 
 	return r
 }
 
-// Zrscan list key-score pairs of a zset, in reverse order
+// Zrscan list key-score pairs of a zset, in reverse order.
 func (db *DB) Zrscan(name string, keyStart, scoreStart []byte, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
@@ -592,9 +796,9 @@ func (db *DB) Zrscan(name string, keyStart, scoreStart []byte, limit int) *Reply
 		}
 		c := b.Cursor()
 
-		k0, v0 := []byte{}, []byte{}
+		var k0, v0 []byte
 		if len(scoreStart) > 0 {
-			k0, v0 = c.Seek(scoreStartB) // or c.Seek(startScoreKeyB)
+			k0, v0 = c.Seek(scoreStartB)
 		} else {
 			k0, v0 = c.Last()
 		}
@@ -602,13 +806,15 @@ func (db *DB) Zrscan(name string, keyStart, scoreStart []byte, limit int) *Reply
 		n := 0
 		for k, _ := k0, v0; k != nil; k, _ = c.Prev() {
 			if bytes.Compare(k, startScoreKeyB) == -1 {
-				n++
-				r.State = replyOK
 				r.Data = append(r.Data, k[8:], k[0:8])
+				n++
 				if n == limit {
 					break
 				}
 			}
+		}
+		if n > 0 {
+			r.State = replyOK
 		}
 		return nil
 	})
@@ -618,7 +824,7 @@ func (db *DB) Zrscan(name string, keyStart, scoreStart []byte, limit int) *Reply
 	return r
 }
 
-// String is a convenience wrapper over Get for string value
+// String is a convenience wrapper over Get for string value.
 func (r *Reply) String() string {
 	if len(r.Data) > 0 {
 		return B2s(r.Data[0])
@@ -626,12 +832,12 @@ func (r *Reply) String() string {
 	return ""
 }
 
-// Int is a convenience wrapper over Get for int value of a hashmap
+// Int is a convenience wrapper over Get for int value of a hashmap.
 func (r *Reply) Int() int {
 	return int(r.Uint64())
 }
 
-// Int64 is a convenience wrapper over Get for int64 value of a hashmap
+// Int64 is a convenience wrapper over Get for int64 value of a hashmap.
 func (r *Reply) Int64() int64 {
 	if len(r.Data) < 1 {
 		return 0
@@ -639,12 +845,12 @@ func (r *Reply) Int64() int64 {
 	return int64(r.Uint64())
 }
 
-// Uint is a convenience wrapper over Get for uint value of a hashmap
+// Uint is a convenience wrapper over Get for uint value of a hashmap.
 func (r *Reply) Uint() uint {
 	return uint(r.Uint64())
 }
 
-// Uint64 is a convenience wrapper over Get for uint64 value of a hashmap
+// Uint64 is a convenience wrapper over Get for uint64 value of a hashmap.
 func (r *Reply) Uint64() uint64 {
 	if len(r.Data) < 1 {
 		return 0
@@ -655,24 +861,26 @@ func (r *Reply) Uint64() uint64 {
 	return binary.BigEndian.Uint64(r.Data[0])
 }
 
-// List retrieves the key/value pairs from reply of a hashmap
+// List retrieves the key/value pairs from reply of a hashmap.
 func (r *Reply) List() []Entry {
-	list := []Entry{}
 	if len(r.Data) < 1 {
-		return list
+		return []Entry{}
 	}
+	list := make([]Entry, len(r.Data)/2)
+	j := 0
 	for i := 0; i < (len(r.Data) - 1); i += 2 {
-		list = append(list, Entry{r.Data[i], r.Data[i+1]})
+		list[j] = Entry{r.Data[i], r.Data[i+1]}
+		j++
 	}
 	return list
 }
 
-// Dict retrieves the key/value pairs from reply of a hashmap
+// Dict retrieves the key/value pairs from reply of a hashmap.
 func (r *Reply) Dict() map[string][]byte {
-	dict := make(map[string][]byte)
 	if len(r.Data) < 1 {
-		return dict
+		return map[string][]byte{}
 	}
+	dict := make(map[string][]byte, len(r.Data)/2)
 	for i := 0; i < (len(r.Data) - 1); i += 2 {
 		dict[B2s(r.Data[i])] = r.Data[i+1]
 	}
@@ -680,7 +888,7 @@ func (r *Reply) Dict() map[string][]byte {
 }
 
 // JSON parses the JSON-encoded Reply Entry value and stores the result
-// in the value pointed to by v
+// in the value pointed to by v.
 func (r *Reply) JSON(v interface{}) error {
 	return json.Unmarshal(r.Data[0], &v)
 }
@@ -689,22 +897,22 @@ func (r bs) String() string {
 	return B2s(r)
 }
 
-// Int is a convenience wrapper over Get for int value of a hashmap
+// Int is a convenience wrapper over Get for int value of a hashmap.
 func (r bs) Int() int {
 	return int(r.Uint64())
 }
 
-// Int64 is a convenience wrapper over Get for int64 value of a hashmap
+// Int64 is a convenience wrapper over Get for int64 value of a hashmap.
 func (r bs) Int64() int64 {
 	return int64(r.Uint64())
 }
 
-// Uint is a convenience wrapper over Get for uint value of a hashmap
+// Uint is a convenience wrapper over Get for uint value of a hashmap.
 func (r bs) Uint() uint {
 	return uint(r.Uint64())
 }
 
-// Uint64 is a convenience wrapper over Get for uint64 value of a hashmap
+// Uint64 is a convenience wrapper over Get for uint64 value of a hashmap.
 func (r bs) Uint64() uint64 {
 	if len(r) < 8 {
 		return 0
@@ -713,7 +921,7 @@ func (r bs) Uint64() uint64 {
 }
 
 // JSON parses the JSON-encoded Reply Entry value and stores the result
-// in the value pointed to by v
+// in the value pointed to by v.
 func (r bs) JSON(v interface{}) error {
 	return json.Unmarshal(r, &v)
 }
@@ -733,17 +941,17 @@ func Bconcat(slices [][]byte) []byte {
 }
 
 // DS2b returns an 8-byte big endian representation of Digit string
-// v ("123456") -> uint64(123456) -> 8-byte big endian
-func DS2b(v string) ([]byte, error) {
+// v ("123456") -> uint64(123456) -> 8-byte big endian.
+func DS2b(v string) []byte {
 	i, err := strconv.ParseUint(v, 10, 64)
 	if err != nil {
-		return nil, err
+		return []byte("")
 	}
-	return I2b(i), nil
+	return I2b(i)
 }
 
 // DS2i returns uint64 of Digit string
-// v ("123456") -> uint64(123456)
+// v ("123456") -> uint64(123456).
 func DS2i(v string) uint64 {
 	i, err := strconv.ParseUint(v, 10, 64)
 	if err != nil {
@@ -753,7 +961,7 @@ func DS2i(v string) uint64 {
 }
 
 // Itob returns an 8-byte big endian representation of v
-// v uint64(123456) -> 8-byte big endian
+// v uint64(123456) -> 8-byte big endian.
 func I2b(v uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, v)
@@ -761,13 +969,13 @@ func I2b(v uint64) []byte {
 }
 
 // Btoi return an int64 of v
-// v (8-byte big endian) -> uint64(123456)
+// v (8-byte big endian) -> uint64(123456).
 func B2i(v []byte) uint64 {
 	return binary.BigEndian.Uint64(v)
 }
 
 // B2ds return a Digit string of v
-// uint64(123456) -> v (8-byte big endian) -> "123456"
+// v (8-byte big endian) -> uint64(123456) -> "123456".
 func B2ds(v []byte) string {
 	return strconv.FormatUint(binary.BigEndian.Uint64(v), 10)
 }
