@@ -60,9 +60,9 @@ func main() {
 	k, _ := youdb.DS2b("19822112")
 	v := uint64(121211121212233)
 	db.Hset("mytestnum", k, youdb.I2b(v))
-	r := db.Hget("mytestnum2", k)
+	r := db.Hget("mytestnum", k)
 	if r.State == "ok" {
-		fmt.Println(r.Int64(), r.Data[0].Int64(), string(r.Data[0]))
+		fmt.Println(r.Int64(), r.Data[0].Int64(), string(r.Data[0]), youdb.B2i(r.Data[0]))
 	} else {
 		fmt.Println(r.State, r.Int64())
 	}
@@ -79,5 +79,9 @@ func main() {
 	fmt.Println(db.Zincr("num", []byte("k1"), 2))
 }
 ```
+
+## Who's using youdb?
+
+- [goyoubbs](https://www.youbbs.org/) - A forum/discussion software written in Go.
 
 
