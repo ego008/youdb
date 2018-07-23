@@ -960,7 +960,7 @@ func DS2i(v string) uint64 {
 	return i
 }
 
-// Itob returns an 8-byte big endian representation of v
+// I2b returns an 8-byte big endian representation of v
 // v uint64(123456) -> 8-byte big endian.
 func I2b(v uint64) []byte {
 	b := make([]byte, 8)
@@ -968,7 +968,7 @@ func I2b(v uint64) []byte {
 	return b
 }
 
-// Btoi return an int64 of v
+// B2i return an int64 of v
 // v (8-byte big endian) -> uint64(123456).
 func B2i(v []byte) uint64 {
 	return binary.BigEndian.Uint64(v)
