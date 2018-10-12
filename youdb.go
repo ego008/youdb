@@ -131,10 +131,10 @@ func (db *DB) Hincr(name string, key []byte, step int64) (uint64, error) {
 			}
 			oldNum += uint64(step)
 		} else {
-			if (oldNum - uint64(-step)) < scoreMin {
+			if uint64(-step) > oldNum {
 				return errors.New("overflow number")
 			}
-			oldNum = uint64(-step)
+			oldNum -= uint64(-step)
 		}
 
 		err := b.Put(key, I2b(oldNum))
@@ -513,7 +513,7 @@ func (db *DB) Zincr(name string, key []byte, step int64) (uint64, error) {
 			score += uint64(step)
 		} else {
 
-			if (score - uint64(-step)) < scoreMin {
+			if uint64(-step) > score {
 				return errors.New("overflow number")
 			}
 			score -= uint64(-step)
