@@ -824,6 +824,14 @@ func (db *DB) Zrscan(name string, keyStart, scoreStart []byte, limit int) *Reply
 	return r
 }
 
+func (r *Reply) OK() bool {
+	return r.Status == ResultOK
+}
+
+func (r *Reply) NotFound() bool {
+	return r.Status == ResultNotFound
+}
+
 // String is a convenience wrapper over Get for string value.
 func (r *Reply) String() string {
 	if len(r.Data) > 0 {
