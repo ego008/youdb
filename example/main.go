@@ -43,6 +43,11 @@ func main() {
 		}
 	}
 
+	// KvEach
+	db.Hscan("myhmset", nil, 100).KvEach(func(key, value youdb.BS) {
+		fmt.Println("KvEach:", key.String(), value.String())
+	})
+
 	db.Hset("new2", []byte("123456783:abcd:xzaksas"), []byte("value1"))
 	db.Hset("new2", []byte("123456781:zsabcd:xzaksas"), []byte("value1"))
 	db.Hset("new2", []byte("123456782:1q23wqwqqw:xzaksa3"), []byte("value1"))
