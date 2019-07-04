@@ -31,7 +31,7 @@ var (
 )
 
 type (
-	bs []byte
+	BS []byte
 	// DB embeds a bolt.DB.
 	DB struct {
 		*bolt.DB
@@ -40,12 +40,12 @@ type (
 	// Reply a holder for a Entry list of a hashmap.
 	Reply struct {
 		State string
-		Data  []bs
+		Data  []BS
 	}
 
 	// Entry a key-value pair.
 	Entry struct {
-		Key, Value bs
+		Key, Value BS
 	}
 )
 
@@ -185,7 +185,7 @@ func (db *DB) HdelBucket(name string) error {
 func (db *DB) Hget(name string, key []byte) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  []bs{},
+		Data:  []BS{},
 	}
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -267,7 +267,7 @@ func (db *DB) HnextSequence(name string) (uint64, error) {
 func (db *DB) Hmget(name string, keys [][]byte) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  []bs{},
+		Data:  []BS{},
 	}
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -296,7 +296,7 @@ func (db *DB) Hmget(name string, keys [][]byte) *Reply {
 func (db *DB) Hscan(name string, keyStart []byte, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  []bs{},
+		Data:  []BS{},
 	}
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -330,7 +330,7 @@ func (db *DB) Hscan(name string, keyStart []byte, limit int) *Reply {
 func (db *DB) Hrscan(name string, keyStart []byte, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  []bs{},
+		Data:  []BS{},
 	}
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -614,7 +614,7 @@ func (db *DB) ZdelBucket(name string) error {
 func (db *DB) Zget(name string, key []byte) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  []bs{},
+		Data:  []BS{},
 	}
 	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
 	err := db.DB.View(func(tx *bolt.Tx) error {
@@ -697,7 +697,7 @@ func (db *DB) ZnextSequence(name string) (uint64, error) {
 func (db *DB) Zmget(name string, keys [][]byte) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  []bs{},
+		Data:  []BS{},
 	}
 	scoreBucket := Bconcat([][]byte{zetScorePrefix, S2b(name)})
 
@@ -727,7 +727,7 @@ func (db *DB) Zmget(name string, keys [][]byte) *Reply {
 func (db *DB) Zscan(name string, keyStart, scoreStart []byte, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  []bs{},
+		Data:  []BS{},
 	}
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, S2b(name)})
 
@@ -771,7 +771,7 @@ func (db *DB) Zscan(name string, keyStart, scoreStart []byte, limit int) *Reply 
 func (db *DB) Zrscan(name string, keyStart, scoreStart []byte, limit int) *Reply {
 	r := &Reply{
 		State: replyError,
-		Data:  []bs{},
+		Data:  []BS{},
 	}
 	keyBucket := Bconcat([][]byte{zetKeyPrefix, S2b(name)})
 
@@ -830,6 +830,13 @@ func (r *Reply) OK() bool {
 
 func (r *Reply) NotFound() bool {
 	return r.State == replyNotFound
+}
+
+func (r *Reply) Bytes() []byte {
+	if len(r.Data) > 0 {
+		return r.Data[0]
+	}
+	return nil
 }
 
 // String is a convenience wrapper over Get for string value.
@@ -895,43 +902,58 @@ func (r *Reply) Dict() map[string][]byte {
 	return dict
 }
 
+func (r *Reply) KvLen() int {
+	return len(r.Data) / 2
+}
+
+func (r *Reply) KvEach(fn func(key, value BS)) int {
+	for i := 0; i < (len(r.Data) - 1); i += 2 {
+		fn(r.Data[i], r.Data[i+1])
+	}
+	return r.KvLen()
+}
+
 // JSON parses the JSON-encoded Reply Entry value and stores the result
 // in the value pointed to by v.
 func (r *Reply) JSON(v interface{}) error {
 	return json.Unmarshal(r.Data[0], &v)
 }
 
-func (r bs) String() string {
-	return B2s(r)
+func (b BS) Bytes() []byte {
+	return b
+}
+
+func (b BS) String() string {
+	return B2s(b)
 }
 
 // Int is a convenience wrapper over Get for int value of a hashmap.
-func (r bs) Int() int {
-	return int(r.Uint64())
+func (b BS) Int() int {
+	return int(b.Uint64())
 }
 
 // Int64 is a convenience wrapper over Get for int64 value of a hashmap.
-func (r bs) Int64() int64 {
-	return int64(r.Uint64())
+func (b BS) Int64() int64 {
+	return int64(b.Uint64())
 }
 
 // Uint is a convenience wrapper over Get for uint value of a hashmap.
-func (r bs) Uint() uint {
-	return uint(r.Uint64())
+func (b BS) Uint() uint {
+	return uint(b.Uint64())
 }
 
 // Uint64 is a convenience wrapper over Get for uint64 value of a hashmap.
-func (r bs) Uint64() uint64 {
-	if len(r) < 8 {
+func (b BS) Uint64() uint64 {
+	if len(b) < 8 {
 		return 0
 	}
-	return binary.BigEndian.Uint64(r)
+	return binary.BigEndian.Uint64(b)
 }
 
 // JSON parses the JSON-encoded Reply Entry value and stores the result
 // in the value pointed to by v.
-func (r bs) JSON(v interface{}) error {
-	return json.Unmarshal(r, &v)
+func (b BS) JSON(v interface{}) error {
+	return json.Unmarshal(b, &v)
 }
 
 // Bconcat concat a list of byte
