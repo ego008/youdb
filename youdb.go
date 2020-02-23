@@ -207,6 +207,25 @@ func (db *DB) Hget(name string, key []byte) *Reply {
 	return r
 }
 
+// HgetInt get the value related to the specified key of a hashmap.
+func (db *DB) HgetInt(name string, key []byte) (val uint64) {
+	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
+	_ = db.DB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucketName)
+		if b == nil {
+			return errors.New(bucketNotFound)
+		}
+		v := b.Get(key)
+		if v == nil {
+			return errors.New(keyNotFound)
+		}
+		val = B2i(v)
+		return nil
+	})
+	
+	return
+}
+
 // Hsequence returns the current integer for the bucket without incrementing it.
 func (db *DB) Hsequence(name string) uint64 {
 	bucketName := Bconcat([][]byte{hashPrefix, S2b(name)})
