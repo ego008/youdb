@@ -8,6 +8,7 @@ import (
 	"errors"
 	"github.com/boltdb/bolt"
 	"reflect"
+	"runtime"
 	"strconv"
 	"time"
 	"unsafe"
@@ -1032,17 +1033,20 @@ func B2ds(v []byte) string {
 // B2s converts byte slice to a string without memory allocation.
 // []byte("abc") -> "abc" s
 func B2s(b []byte) string {
+	/* #nosec G103 */
 	return *(*string)(unsafe.Pointer(&b))
 }
 
 // S2b converts string to a byte slice without memory allocation.
 // "abc" -> []byte("abc")
-func S2b(s string) []byte {
+func S2b(s string) (b []byte) {
+	/* #nosec G103 */
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	/* #nosec G103 */
 	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	bh := reflect.SliceHeader{
-		Data: sh.Data,
-		Len:  sh.Len,
-		Cap:  sh.Len,
-	}
-	return *(*[]byte)(unsafe.Pointer(&bh))
+	bh.Data = sh.Data
+	bh.Cap = sh.Len
+	bh.Len = sh.Len
+	runtime.KeepAlive(&s)
+	return b
 }
