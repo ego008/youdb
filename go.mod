@@ -1,6 +1,6 @@
 module github.com/ego008/youdb
 
-go 1.15
+go 1.17
 
 require (
 	github.com/boltdb/bolt v1.3.1
